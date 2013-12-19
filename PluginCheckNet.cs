@@ -11,8 +11,7 @@ namespace PluginCheckNet
     internal class Measure
     {
         public string ConnectionType;
-        public string Type;
-        public double Value;
+        public double ReturnValue = 0;
         public int UpdateRate;
         public int UpdateCounter = 0;
 
@@ -23,82 +22,65 @@ namespace PluginCheckNet
         internal void Reload(Rainmeter.API rm, ref double maxValue)
         {
             ConnectionType = rm.ReadString("ConnectionType", "Internet");
+            ConnectionType = ConnectionType.ToLowerInvariant();
+            if (ConnectionType != "network" && ConnectionType != "internet")
+            {
+                API.Log(API.LogType.Error, "CheckNet.dll: ConnectionType=" + ConnectionType + " not valid");
+            }
+            
             UpdateRate = rm.ReadInt("UpdateRate", 20);
             if (UpdateRate <= 0)
             {
                 UpdateRate = 20;
             }
             
-            switch (ConnectionType.ToLowerInvariant())
-            {
-                case "network":
-                    Type = "1";
-                    break;
-                case "internet":
-                    Type = "2";
-                    break;
-                default:
-                    API.Log(API.LogType.Error, "CheckNet.dll: ConnectionType=" + ConnectionType + " not valid");
-                    break;
-            }
-
         }
 
         internal double Update()
         {
             if (UpdateCounter == 0)
             {
-                switch (Type)
+                if (ConnectionType == "network" || ConnectionType == "internet")
                 {
-                    case "1":
-                        if (System.Convert.ToDouble(NetworkInterface.GetIsNetworkAvailable()) == 0)
+                    if (System.Convert.ToDouble(NetworkInterface.GetIsNetworkAvailable()) == 0)
+                    {
+                        ReturnValue = -1.0;
+                    }
+                    else
+                    {
+                        ReturnValue = 1.0;
+                    }
+                }
+
+                if (ReturnValue == 1.0 && ConnectionType == "internet")
+                {
+                    try
+                    {
+                        IPAddress[] addresslist = Dns.GetHostAddresses("www.msftncsi.com");
+
+                        if (addresslist[0].ToString().Length > 6)
                         {
-                            Value = -1.0;
-                            break;
+                            ReturnValue = 1.0;
                         }
                         else
                         {
-                            Value = 1.0;
-                            break;
+                            ReturnValue = -1.0;
                         }
-
-                    case "2":
-                        try
-                        {
-                            IPAddress[] addresslist = Dns.GetHostAddresses("www.msftncsi.com");
-
-                            if (addresslist[0].ToString().Length > 6)
-                            {
-                                Value = 1.0;
-                                break;
-                            }
-                            else
-                            {
-                                Value = -1.0;
-                                break;
-                            }
-                        }
-                        catch
-                        {
-                            Value = -1.0;
-                            break;
-                        }
-
-                    default:
-                        Value = 0.0;
-                        break;
+                    }
+                    catch
+                    {
+                        ReturnValue = -1.0;
+                    }
                 }
-                
             }
 
-            UpdateCounter = UpdateCounter + 1;
-            if (UpdateCounter >= UpdateRate)
-            {
-                UpdateCounter = 0;
-            }
+                UpdateCounter = UpdateCounter + 1;
+                if (UpdateCounter >= UpdateRate)
+                {
+                    UpdateCounter = 0;
+                }
 
-            return Value;
-        
+                return ReturnValue;
         }
 
         //internal string GetString()
