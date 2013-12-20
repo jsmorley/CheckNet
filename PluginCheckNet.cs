@@ -11,9 +11,9 @@ namespace PluginCheckNet
     internal class Measure
     {
         public string ConnectionType;
-        public double ReturnValue = 0;
+        public double ReturnValue;
         public int UpdateRate;
-        public int UpdateCounter = 0;
+        public int UpdateCounter;
 
         internal Measure()
         {
@@ -21,7 +21,7 @@ namespace PluginCheckNet
 
         internal void Reload(Rainmeter.API rm, ref double maxValue)
         {
-            ConnectionType = rm.ReadString("ConnectionType", "Internet");
+            ConnectionType = rm.ReadString("ConnectionType", "internet");
             ConnectionType = ConnectionType.ToLowerInvariant();
             if (ConnectionType != "network" && ConnectionType != "internet")
             {
@@ -33,7 +33,6 @@ namespace PluginCheckNet
             {
                 UpdateRate = 20;
             }
-            
         }
 
         internal double Update()
