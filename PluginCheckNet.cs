@@ -9,7 +9,9 @@ namespace PluginCheckNet
 {
     internal class Measure
     {
+        public IntPtr SkinHandle;
         public string ConnectionType;
+        public string FinishAction;
         public double ReturnValue;
         public int UpdateCounter;
         public int UpdateRate;
@@ -51,6 +53,11 @@ namespace PluginCheckNet
                 }
             }
 
+            if (!String.IsNullOrEmpty(FinishAction))
+            {
+                API.Execute(SkinHandle, FinishAction);
+            }
+
             Thread.CurrentThread.Abort(); // Never end a thread in the main Update() function.
         }
 
@@ -60,19 +67,20 @@ namespace PluginCheckNet
 
         internal void Reload(Rainmeter.API rm, ref double maxValue)
         {
+            SkinHandle = rm.GetSkin();
             ConnectionType = rm.ReadString("ConnectionType", "INTERNET").ToUpperInvariant();
-            UpdateRate = rm.ReadInt("UpdateRate", 20);
-
-            if (UpdateRate <= 0)
-            {
-                UpdateRate = 20;
-            }
-
             if (ConnectionType != "NETWORK" && ConnectionType != "INTERNET")
             {
                 API.Log(API.LogType.Error, "CheckNet.dll: ConnectionType=" + ConnectionType + " not valid");
             }
 
+            UpdateRate = rm.ReadInt("UpdateRate", 20);
+            if (UpdateRate <= 0)
+            {
+                UpdateRate = 20;
+            }
+
+            FinishAction = rm.ReadString("FinishAction", "");
         }
 
         internal double Update()
