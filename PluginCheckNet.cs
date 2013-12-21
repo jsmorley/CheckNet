@@ -3,6 +3,7 @@ using System.Net;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Net.NetworkInformation;
+using System.Threading;
 using Rainmeter;
 
 namespace PluginCheckNet
@@ -14,6 +15,49 @@ namespace PluginCheckNet
         public double ReturnValue;
         public int UpdateRate;
         public int UpdateCounter;
+        public IntPtr SkinHandle;
+        public string FinishAction;
+
+        
+        private void CheckConnection(string CurrentType)
+        {
+            if (CurrentType == "NETWORK" || CurrentType == "INTERNET")
+            {
+                if (System.Convert.ToDouble(NetworkInterface.GetIsNetworkAvailable()) == 0)
+                {
+                    ReturnValue = -1.0;
+                }
+                else
+                {
+                    ReturnValue = 1.0;
+                }
+            }
+
+            if (ReturnValue == 1.0 && CurrentType == "INTERNET")
+            {
+                try
+                {
+                    IPAddress[] addresslist = Dns.GetHostAddresses("www.msftncsi.com");
+                    if (addresslist[0].ToString().Length > 6)
+                    {
+                        ReturnValue = 1.0;
+                    }
+                    else
+                    {
+                        ReturnValue = -1.0;
+                    }
+                }
+                catch
+                {
+                    ReturnValue = -1.0;
+                }
+            }
+            
+            if (!String.IsNullOrEmpty(FinishAction))
+            {
+                API.Execute(SkinHandle, FinishAction);
+            }
+        }
 
         internal Measure()
         {
@@ -21,9 +65,11 @@ namespace PluginCheckNet
 
         internal void Reload(Rainmeter.API rm, ref double maxValue)
         {
-            ConnectionType = rm.ReadString("ConnectionType", "internet");
-            ConnectionType = ConnectionType.ToLowerInvariant();
-            if (ConnectionType != "network" && ConnectionType != "internet")
+            SkinHandle = rm.GetSkin();
+		    FinishAction = rm.ReadString("FinishAction", "");
+		    ConnectionType = rm.ReadString("ConnectionType", "internet");
+            ConnectionType = ConnectionType.ToUpperInvariant();
+            if (ConnectionType != "NETWORK" && ConnectionType != "INTERNET")
             {
                 API.Log(API.LogType.Error, "CheckNet.dll: ConnectionType=" + ConnectionType + " not valid");
             }
@@ -39,38 +85,16 @@ namespace PluginCheckNet
         {
             if (UpdateCounter == 0)
             {
-                if (ConnectionType == "network" || ConnectionType == "internet")
-                {
-                    if (System.Convert.ToDouble(NetworkInterface.GetIsNetworkAvailable()) == 0)
-                    {
-                        ReturnValue = -1.0;
-                    }
-                    else
-                    {
-                        ReturnValue = 1.0;
-                    }
-                }
-
-                if (ReturnValue == 1.0 && ConnectionType == "internet")
+                Thread ConnectionThread = new Thread(() =>
                 {
                     try
                     {
-                        IPAddress[] addresslist = Dns.GetHostAddresses("www.msftncsi.com");
-
-                        if (addresslist[0].ToString().Length > 6)
-                        {
-                            ReturnValue = 1.0;
-                        }
-                        else
-                        {
-                            ReturnValue = -1.0;
-                        }
+                        CheckConnection(ConnectionType);
                     }
-                    catch
-                    {
-                        ReturnValue = -1.0;
-                    }
-                }
+                        catch (OperationCanceledException) { }
+                    });
+                    
+                    ConnectionThread.Start();
             }
 
                 UpdateCounter = UpdateCounter + 1;
