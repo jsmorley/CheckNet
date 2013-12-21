@@ -18,45 +18,48 @@ namespace PluginCheckNet
         public IntPtr SkinHandle;
         public string FinishAction;
         public Thread ConnectionThread;
+        public readonly object ThreadLocker = new object();
 
-        
         private void CheckConnection(string CurrentType)
         {
-            if (CurrentType == "NETWORK" || CurrentType == "INTERNET")
-            {
-                if (System.Convert.ToDouble(NetworkInterface.GetIsNetworkAvailable()) == 0)
+            lock (ThreadLocker)
+            { 
+                if (CurrentType == "NETWORK" || CurrentType == "INTERNET")
                 {
-                    ReturnValue = -1.0;
-                }
-                else
-                {
-                    ReturnValue = 1.0;
-                }
-            }
-
-            if (ReturnValue == 1.0 && CurrentType == "INTERNET")
-            {
-                try
-                {
-                    IPAddress[] addresslist = Dns.GetHostAddresses("www.msftncsi.com");
-                    if (addresslist[0].ToString().Length > 6)
+                    if (System.Convert.ToDouble(NetworkInterface.GetIsNetworkAvailable()) == 0)
+                    {
+                        ReturnValue = -1.0;
+                    }
+                    else
                     {
                         ReturnValue = 1.0;
                     }
-                    else
+                }
+
+                if (ReturnValue == 1.0 && CurrentType == "INTERNET")
+                {
+                    try
+                    {
+                        IPAddress[] addresslist = Dns.GetHostAddresses("www.msftncsi.com");
+                        if (addresslist[0].ToString().Length > 6)
+                        {
+                            ReturnValue = 1.0;
+                        }
+                        else
+                        {
+                            ReturnValue = -1.0;
+                        }
+                    }
+                    catch
                     {
                         ReturnValue = -1.0;
                     }
                 }
-                catch
+
+                if (!String.IsNullOrEmpty(FinishAction))
                 {
-                    ReturnValue = -1.0;
+                    API.Execute(SkinHandle, FinishAction);
                 }
-            }
-            
-            if (!String.IsNullOrEmpty(FinishAction))
-            {
-                API.Execute(SkinHandle, FinishAction);
             }
         }
 
@@ -67,13 +70,13 @@ namespace PluginCheckNet
         internal void Reload(Rainmeter.API rm, ref double maxValue)
         {
             SkinHandle = rm.GetSkin();
-		    FinishAction = rm.ReadString("FinishAction", "");
-		    ConnectionType = rm.ReadString("ConnectionType", "INTERNET").ToUpperInvariant();
+            FinishAction = rm.ReadString("FinishAction", "");
+            ConnectionType = rm.ReadString("ConnectionType", "INTERNET").ToUpperInvariant();
             if (ConnectionType != "NETWORK" && ConnectionType != "INTERNET")
             {
                 API.Log(API.LogType.Error, "CheckNet.dll: ConnectionType=" + ConnectionType + " not valid");
             }
-            
+
             UpdateRate = rm.ReadInt("UpdateRate", 20);
             if (UpdateRate <= 0)
             {
@@ -101,13 +104,13 @@ namespace PluginCheckNet
 
             }
 
-                UpdateCounter = UpdateCounter + 1;
-                if (UpdateCounter >= UpdateRate)
-                {
-                    UpdateCounter = 0;
-                }
+            UpdateCounter = UpdateCounter + 1;
+            if (UpdateCounter >= UpdateRate)
+            {
+                UpdateCounter = 0;
+            }
 
-                return ReturnValue;
+            return ReturnValue;
         }
 
         //internal string GetString()
