@@ -17,6 +17,7 @@ namespace PluginCheckNet
         public int UpdateCounter;
         public IntPtr SkinHandle;
         public string FinishAction;
+        public Thread ConnectionThread;
 
         
         private void CheckConnection(string CurrentType)
@@ -67,8 +68,7 @@ namespace PluginCheckNet
         {
             SkinHandle = rm.GetSkin();
 		    FinishAction = rm.ReadString("FinishAction", "");
-		    ConnectionType = rm.ReadString("ConnectionType", "internet");
-            ConnectionType = ConnectionType.ToUpperInvariant();
+		    ConnectionType = rm.ReadString("ConnectionType", "INTERNET").ToUpperInvariant();
             if (ConnectionType != "NETWORK" && ConnectionType != "INTERNET")
             {
                 API.Log(API.LogType.Error, "CheckNet.dll: ConnectionType=" + ConnectionType + " not valid");
@@ -85,16 +85,20 @@ namespace PluginCheckNet
         {
             if (UpdateCounter == 0)
             {
-                Thread ConnectionThread = new Thread(() =>
+                if (ConnectionThread == null || ConnectionThread.ThreadState == ThreadState.Stopped)
                 {
-                    try
+                    ConnectionThread = new Thread(() =>
                     {
-                        CheckConnection(ConnectionType);
-                    }
+                        try
+                        {
+                            CheckConnection(ConnectionType);
+                        }
                         catch (OperationCanceledException) { }
                     });
-                    
+
                     ConnectionThread.Start();
+                }
+
             }
 
                 UpdateCounter = UpdateCounter + 1;
