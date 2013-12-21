@@ -1,65 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Net.NetworkInformation;
-using System.Threading;
 using Rainmeter;
 
 namespace PluginCheckNet
 {
+
     internal class Measure
     {
-        public IntPtr SkinHandle;
         public string ConnectionType;
-        public string FinishAction;
         public double ReturnValue;
-        public int UpdateCounter;
         public int UpdateRate;
-
-        static Thread _networkThread;
-
-        void CheckConnection(object type)
-        {
-            if ((string)type == "NETWORK" || (string)type == "INTERNET")
-            {
-                if (Convert.ToDouble(NetworkInterface.GetIsNetworkAvailable()) == 0)
-                {
-                    ReturnValue = -1.0;
-                }
-                else
-                {
-                    ReturnValue = 1.0;
-                }
-            }
-
-            if (ReturnValue == 1.0 && (string)type == "INTERNET")
-            {
-                try
-                {
-                    IPAddress[] addresslist = Dns.GetHostAddresses("www.msftncsi.com");
-
-                    if (addresslist[0].ToString().Length > 6)
-                    {
-                        ReturnValue = 1.0;
-                    }
-                    else
-                    {
-                        ReturnValue = -1.0;
-                    }
-                }
-                catch
-                {
-                    ReturnValue = -1.0;
-                }
-            }
-
-            if (!String.IsNullOrEmpty(FinishAction))
-            {
-                API.Execute(SkinHandle, FinishAction);
-            }
-
-            Thread.CurrentThread.Abort(); // Never end a thread in the main Update() function.
-        }
+        public int UpdateCounter;
 
         internal Measure()
         {
@@ -67,45 +21,65 @@ namespace PluginCheckNet
 
         internal void Reload(Rainmeter.API rm, ref double maxValue)
         {
-            SkinHandle = rm.GetSkin();
-            ConnectionType = rm.ReadString("ConnectionType", "INTERNET").ToUpperInvariant();
-            if (ConnectionType != "NETWORK" && ConnectionType != "INTERNET")
+            ConnectionType = rm.ReadString("ConnectionType", "internet");
+            ConnectionType = ConnectionType.ToLowerInvariant();
+            if (ConnectionType != "network" && ConnectionType != "internet")
             {
                 API.Log(API.LogType.Error, "CheckNet.dll: ConnectionType=" + ConnectionType + " not valid");
             }
-
+            
             UpdateRate = rm.ReadInt("UpdateRate", 20);
             if (UpdateRate <= 0)
             {
                 UpdateRate = 20;
             }
-
-            FinishAction = rm.ReadString("FinishAction", "");
         }
 
         internal double Update()
         {
             if (UpdateCounter == 0)
             {
-                if (ConnectionType == "NETWORK" || ConnectionType == "INTERNET")
+                if (ConnectionType == "network" || ConnectionType == "internet")
                 {
-                    if (_networkThread == null ||_networkThread.ThreadState == ThreadState.Stopped)
-                    //We check here to see if all existing instances of the thread have stopped,
-                    //and start a new one if so.
+                    if (System.Convert.ToDouble(NetworkInterface.GetIsNetworkAvailable()) == 0)
                     {
-                        _networkThread = new Thread(CheckConnection);
-                        _networkThread.Start(ConnectionType);
+                        ReturnValue = -1.0;
+                    }
+                    else
+                    {
+                        ReturnValue = 1.0;
+                    }
+                }
+
+                if (ReturnValue == 1.0 && ConnectionType == "internet")
+                {
+                    try
+                    {
+                        IPAddress[] addresslist = Dns.GetHostAddresses("www.msftncsi.com");
+
+                        if (addresslist[0].ToString().Length > 6)
+                        {
+                            ReturnValue = 1.0;
+                        }
+                        else
+                        {
+                            ReturnValue = -1.0;
+                        }
+                    }
+                    catch
+                    {
+                        ReturnValue = -1.0;
                     }
                 }
             }
 
-            UpdateCounter = UpdateCounter + 1;
-            if (UpdateCounter >= UpdateRate)
-            {
-                UpdateCounter = 0;
-            }
+                UpdateCounter = UpdateCounter + 1;
+                if (UpdateCounter >= UpdateRate)
+                {
+                    UpdateCounter = 0;
+                }
 
-            return ReturnValue;
+                return ReturnValue;
         }
 
         //internal string GetString()
@@ -116,35 +90,24 @@ namespace PluginCheckNet
         //internal void ExecuteBang(string args)
         //{
         //}
-
-        //it is recommended that this Dispose() function be in all examples,
-        //and called in Finalize().
-
-        internal static void Dispose()
-        {
-            if (_networkThread.IsAlive)
-                _networkThread.Abort();
-        }
     }
 
-    static class Plugin
+    public static class Plugin
     {
-        static Dictionary<uint, Measure> Measures = new Dictionary<uint, Measure>();
-
-        [DllExport]
-        public unsafe static void Finalize(void* data)
-        {
-            Measure.Dispose();
-            uint id = (uint)data;
-            Measures.Remove(id);
-        }
-
         [DllExport]
         public unsafe static void Initialize(void** data, void* rm)
         {
             uint id = (uint)((void*)*data);
             Measures.Add(id, new Measure());
         }
+
+        [DllExport]
+        public unsafe static void Finalize(void* data)
+        {
+            uint id = (uint)data;
+            Measures.Remove(id);
+        }
+
         [DllExport]
         public unsafe static void Reload(void* data, void* rm, double* maxValue)
         {
@@ -172,6 +135,7 @@ namespace PluginCheckNet
         //    uint id = (uint)data;
         //    Measures[id].ExecuteBang(new string(args));
         //}
-    }
 
+        internal static Dictionary<uint, Measure> Measures = new Dictionary<uint, Measure>();
+    }
 }
