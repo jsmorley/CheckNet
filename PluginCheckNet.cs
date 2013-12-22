@@ -22,6 +22,9 @@ namespace PluginCheckNet
 
         private void CheckConnection(string CurrentType)
         {
+            /* This is locking reads of ConnectionType and FinishAction,
+             * and writes to ReturnValue
+             */
             lock (ThreadLocker)
             { 
                 if (CurrentType == "NETWORK" || CurrentType == "INTERNET")
@@ -70,8 +73,16 @@ namespace PluginCheckNet
         internal void Reload(Rainmeter.API rm, ref double maxValue)
         {
             SkinHandle = rm.GetSkin();
-            FinishAction = rm.ReadString("FinishAction", "");
-            ConnectionType = rm.ReadString("ConnectionType", "INTERNET").ToUpperInvariant();
+
+            /* This locks writes to FinishAction and ConnectionType.  Reload() will not
+             * be able to mutate them while CheckConnection() is still holding the lock.
+             */
+            lock (ThreadLocker)
+            {
+                FinishAction = rm.ReadString("FinishAction", "");
+                ConnectionType = rm.ReadString("ConnectionType", "INTERNET").ToUpperInvariant();
+            }
+            
             if (ConnectionType != "NETWORK" && ConnectionType != "INTERNET")
             {
                 API.Log(API.LogType.Error, "CheckNet.dll: ConnectionType=" + ConnectionType + " not valid");
